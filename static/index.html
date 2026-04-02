@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Analytics Agent</title>
+<script src="/vendor/vega.min.js"></script>
+<script src="/vendor/vega-lite.min.js"></script>
+<script src="/vendor/vega-embed.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f0f2f5;height:100vh;display:flex;flex-direction:column;color:#2c3e50}
+
+.header{background:#002855;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 12px rgba(0,40,85,.3)}
+.header .title-group{display:flex;flex-direction:column}
+.header h1{font-size:16px;font-weight:600;letter-spacing:.3px}
+.header .subtitle{font-size:11px;opacity:.75;margin-top:1px}
+.header .badge{margin-left:auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);padding:4px 10px;border-radius:12px;font-size:11px;letter-spacing:.3px}
+
+.chat-container{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+
+.message{max-width:82%;padding:14px 18px;border-radius:12px;font-size:14px;line-height:1.6;animation:fadeIn .3s ease}
+.message.user{align-self:flex-end;background:#002855;color:#fff;border-bottom-right-radius:4px}
+.message.assistant{align-self:flex-start;background:#fff;color:#2c3e50;border-bottom-left-radius:4px;box-shadow:0 1px 6px rgba(0,40,85,.08);border:1px solid #e4e8ec}
+
+.message.assistant h1,.message.assistant h2,.message.assistant h3{margin:10px 0 6px;color:#002855}
+.message.assistant h1{font-size:17px}
+.message.assistant h2{font-size:15px}
+.message.assistant h3{font-size:14px}
+.message.assistant p{margin:4px 0}
+.message.assistant ul,.message.assistant ol{margin:4px 0 4px 18px}
+.message.assistant li{margin:2px 0}
+.message.assistant code{background:#eef2f7;padding:1px 5px;border-radius:3px;font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:12px;color:#1a4a7a}
+.message.assistant pre{background:#eef2f7;border:1px solid #d5dce6;border-radius:6px;padding:8px 10px;margin:8px 0;overflow-x:auto}
+.message.assistant pre code{background:none;padding:0;color:#2c3e50}
+.message.assistant strong{color:#1e1e1e}
+
+.sql-toggle{margin-top:10px;border:1px solid #d5dce6;border-radius:6px;overflow:hidden}
+.sql-toggle summary{cursor:pointer;background:#eef2f7;padding:8px 12px;font-size:12px;font-family:'SF Mono',Consolas,monospace;color:#5a6a7a;user-select:none;list-style:none;display:flex;align-items:center;gap:6px}
+.sql-toggle summary::-webkit-details-marker{display:none}
+.sql-toggle summary::before{content:'▶';font-size:10px;transition:transform .2s}
+.sql-toggle[open] summary::before{transform:rotate(90deg)}
+.sql-toggle .sql-label{font-weight:600;color:#002855}
+.sql-toggle .sql-preview{color:#7a8a9a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sql-toggle pre{margin:0;border:none;border-top:1px solid #d5dce6;border-radius:0;padding:10px 12px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto}
+
+.message table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px;border:1px solid #d5dce6;border-radius:6px;overflow:hidden}
+.message th{background:#002855;color:#fff;padding:7px 10px;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.message td{padding:6px 10px;border-bottom:1px solid #e8ecf0}
+.message tr:nth-child(even){background:#f7f9fb}
+.message tr:hover{background:#eef3f8}
+
+.chart-container{margin-top:12px;background:#fff;border:1px solid #d5dce6;border-radius:8px;padding:16px;width:100%;overflow:hidden}
+.chart-container .vega-embed{width:100%!important}
+.chart-container .vega-embed details,.chart-container .vega-embed .vega-actions{display:none!important}
+
+.input-area{padding:14px 20px;background:#fff;border-top:1px solid #d5dce6;display:flex;gap:10px;box-shadow:0 -2px 8px rgba(0,0,0,.04)}
+.input-area input{flex:1;padding:11px 16px;border:1px solid #c8d0da;border-radius:8px;font-size:14px;outline:none;transition:border .2s,box-shadow .2s}
+.input-area input:focus{border-color:#002855;box-shadow:0 0 0 3px rgba(0,40,85,.12)}
+.input-area button{padding:11px 24px;background:#002855;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s}
+.input-area button:hover{background:#001a3a}
+.input-area button:disabled{background:#94a3b8;cursor:not-allowed}
+
+.typing{display:flex;gap:4px;padding:8px 12px}
+.typing span{width:8px;height:8px;background:#002855;opacity:.4;border-radius:50%;animation:bounce .6s infinite alternate}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+
+.suggestions{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 10px}
+.suggestions button{padding:7px 14px;background:#e8eef6;color:#002855;border:1px solid #c4d2e4;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s}
+.suggestions button:hover{background:#002855;color:#fff;border-color:#002855}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bounce{to{transform:translateY(-6px)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title-group">
+    <h1>Sales Analytics Agent</h1>
+    <span class="subtitle">Powered by Snowflake Cortex</span>
+  </div>
+  <span class="badge">AI Assistant</span>
+</div>
+
+<div class="chat-container" id="chat"></div>
+
+<div class="suggestions" id="suggestions">
+  <button onclick="askQuestion('What is the total revenue by product category?')">Revenue by Category</button>
+  <button onclick="askQuestion('Who are the top 5 customers by total sales?')">Top 5 Customers</button>
+  <button onclick="askQuestion('Show monthly revenue trend for 2025')">Monthly Trend</button>
+  <button onclick="askQuestion('What is the revenue split by region?')">Revenue by Region</button>
+  <button onclick="askQuestion('Which shipping method is most popular?')">Shipping Analysis</button>
+</div>
+
+<div class="input-area">
+  <input type="text" id="userInput" placeholder="Ask about sales data..." onkeydown="if(event.key==='Enter')sendMessage()">
+  <button id="sendBtn" onclick="sendMessage()">Ask</button>
+</div>
+
+<script>
+function mdToHtml(md) {
+  var html = md;
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
+    return '<pre><code>' + code.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim() + '</code></pre>';
+  });
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  var lines = html.split('\n');
+  var result = [];
+  var inList = false;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var listMatch = line.match(/^(\s*)[-*]\s+(.*)/);
+    if (listMatch) {
+      if (!inList) { result.push('<ul>'); inList = true; }
+      result.push('<li>' + listMatch[2] + '</li>');
+    } else {
+      if (inList) { result.push('</ul>'); inList = false; }
+      if (line.match(/^<h[123]>/) || line.match(/^<pre>/) || line.match(/^<\/pre>/) || line.match(/^<ul>/) || line.match(/^<\/ul>/)) {
+        result.push(line);
+      } else if (line.trim() === '') {
+        result.push('');
+      } else {
+        result.push('<p>' + line + '</p>');
+      }
+    }
+  }
+  if (inList) result.push('</ul>');
+  return result.join('\n');
+}
+
+const API_URL = window.location.origin + '/api/chat';
+const chatEl = document.getElementById('chat');
+const inputEl = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const suggestionsEl = document.getElementById('suggestions');
+let conversationHistory = [];
+
+function addMessage(role, content) {
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+  div.innerHTML = content;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.id = 'typing';
+  div.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing');
+  if (el) el.remove();
+}
+
+function renderTable(data) {
+  if (!data || data.length === 0) return '';
+  const keys = Object.keys(data[0]);
+  let html = '<table><thead><tr>';
+  keys.forEach(function(k) { html += '<th>' + k + '</th>'; });
+  html += '</tr></thead><tbody>';
+  const maxRows = Math.min(data.length, 20);
+  for (let i = 0; i < maxRows; i++) {
+    html += '<tr>';
+    keys.forEach(function(k) { html += '<td>' + (data[i][k] != null ? data[i][k] : '') + '</td>'; });
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  if (data.length > 20) html += '<p style="font-size:11px;color:#7a8a9a;margin-top:4px">Showing 20 of ' + data.length + ' rows</p>';
+  return html;
+}
+
+function renderSqlBlock(sql) {
+  var preview = sql.replace(/\s+/g, ' ').trim();
+  if (preview.length > 80) preview = preview.substring(0, 80) + '…';
+  return '<details class="sql-toggle">' +
+    '<summary><span class="sql-label">SQL Query</span><span class="sql-preview">' + preview.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></summary>' +
+    '<pre><code>' + sql.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>' +
+    '</details>';
+}
+
+async function sendMessage() {
+  const question = inputEl.value.trim();
+  if (!question) return;
+
+  inputEl.value = '';
+  sendBtn.disabled = true;
+  suggestionsEl.style.display = 'none';
+  addMessage('user', question);
+  showTyping();
+
+  try {
+    const resp = await fetch(API_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: question, conversation_history: conversationHistory}),
+    });
+
+    removeTyping();
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      addMessage('assistant', '<span style="color:#dc2626">Error: ' + errText + '</span>');
+      sendBtn.disabled = false;
+      return;
+    }
+
+    const data = await resp.json();
+    let html = mdToHtml(data.answer);
+
+    if (data.chart_spec) {
+      html += '<div class="chart-container" id="chart-' + Date.now() + '"></div>';
+    }
+
+    if (data.sql) {
+      html += renderSqlBlock(data.sql);
+    }
+
+    if (data.data && data.data.length > 0) {
+      html += renderTable(data.data);
+    }
+
+    const msgDiv = addMessage('assistant', html);
+
+    if (data.chart_spec) {
+      try {
+        var chartDiv = msgDiv.querySelector('.chart-container');
+        if (chartDiv && typeof vegaEmbed !== 'undefined') {
+          var spec = (typeof data.chart_spec === 'string') ? JSON.parse(data.chart_spec) : data.chart_spec;
+          console.log('Chart spec:', JSON.stringify(spec).substring(0, 500));
+          var chartWidth = Math.max(chartDiv.offsetWidth - 40, 400);
+          spec.width = chartWidth;
+          spec.height = 320;
+          spec.autosize = {type: 'fit', contains: 'padding'};
+          vegaEmbed(chartDiv, spec, {actions: false, renderer: 'svg'}).then(function(result) {
+            console.log('Chart rendered successfully');
+          }).catch(function(e) {
+            console.warn('Chart render failed', e);
+            chartDiv.innerHTML = '<p style="color:#dc2626;font-size:12px">Chart error: ' + e.message + '</p>';
+          });
+        }
+      } catch (e) {
+        console.warn('Chart parse failed', e);
+        var cd = msgDiv.querySelector('.chart-container');
+        if (cd) cd.innerHTML = '<p style="color:#dc2626;font-size:12px">Chart parse error: ' + e.message + '</p>';
+      }
+    }
+
+    conversationHistory.push(
+      {role: 'user', content: [{type: 'text', text: question}]},
+      {role: 'assistant', content: [{type: 'text', text: data.answer}]}
+    );
+
+  } catch (err) {
+    removeTyping();
+    addMessage('assistant', '<span style="color:#dc2626">Error: ' + err.message + '</span>');
+  }
+
+  sendBtn.disabled = false;
+  inputEl.focus();
+}
+
+function askQuestion(q) {
+  inputEl.value = q;
+  sendMessage();
+}
+</script>
+</body>
+</html>

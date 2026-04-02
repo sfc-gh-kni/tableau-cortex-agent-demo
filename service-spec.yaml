@@ -1,0 +1,23 @@
+spec:
+  containers:
+  - name: cortex-agent-middleware
+    image: /TABLEAU_DEMO/TABLEAU_AGENT_DEMO/IMAGE_REPO/cortex-agent-middleware:latest
+    env:
+      SNOWFLAKE_WAREHOUSE: "COMPUTE_WH"
+      SNOWFLAKE_DATABASE: "TABLEAU_DEMO"
+      SNOWFLAKE_SCHEMA: "TABLEAU_AGENT_DEMO"
+      AGENT_NAME: "SALES_AGENT"
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 500m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+    readinessProbe:
+      port: 8080
+      path: /api/health
+  endpoints:
+  - name: chat-ui
+    port: 8080
+    public: true
