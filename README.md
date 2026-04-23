@@ -1,6 +1,6 @@
 # Snowflake Cortex Agent + Tableau Integration Demo
 
-> **This demo shows how to integrate a **Snowflake Cortex Agent** into a **Tableau dashboard** (or any BI tool) via a REST API middleware.**
+> **This demo asset shows how to integrate a **Snowflake Cortex Agent** into a **Tableau dashboard** (or any BI tool) via a REST API middleware.**
 
 ## Architecture
 
